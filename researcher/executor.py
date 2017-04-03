@@ -12,19 +12,37 @@ class Executor(metaclass=ABCMeta):
 	def start(self):
 		raise NotImplementedError()
 
+class LoopedExecutor(Executor):
+
+	def __init__(self, experiment):
+		self._expr = experiment
+
+	def setup(self, *args):
+		self._inputArgs = args
+
+	def start(self):
+		self._results = []
+		for arg in self._inputArgs:
+			self._results.append(self._expr.run(arg))
+
+		return self._results
 
 class MultiProcessExecutor(Executor):
 
-	def __init__(self, experiment, numProcesses):
+	def __init__(self, experiment, numProcesses=None):
 		self._expr = experiment
-		self._numProcesses = numProcesses
+
+		if (numProcesses is None):
+			self._numProcesses = multiprocess.cpu_count() - 1
+		else:
+			self._numProcesses = numProcesses
 
 	def setup(self, *args):
 		self._inputArgs  = args
 		self._workerPool = Pool(processes = self._numProcesses)
 
 	def start(self):
-		chunks = int(len(*self._inputArgs)/self._numProcesses)
+		chunks = max(int(len(*self._inputArgs)/self._numProcesses), 1)
 		print(chunks)
 		self._results = self._workerPool.map_async(self._expr.run, *self._inputArgs, chunksize=chunks)
 
